@@ -1,33 +1,164 @@
 <?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+
+/**
+ * Quickmail-specific subclass of the parent behat library.
+ *
+ * @package    test
+ * @copyright  2015 Louisiana State University
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 
 interface Stringy {
     function __toString();
 }
 
+/**
+ * PHP emulation of a Java enumeration containing the acceptable Mink prefixes.
+ */
+interface Prefix {
+
+    const GIVEN = 'Given';
+
+    // 'AND' is a reserved word.
+    const _AND  = 'And';
+    const THEN  = 'Then';
+}
+
+/**
+ * Fixture elements provided with the Moodle/Behat inetgration.
+ * https://docs.moodle.org/dev/Acceptance_testing
+ *
+ * If you have your own custom generators, you may add to this enum.
+ */
+interface FixtureElement {
+    const CATEGORIES = "categories";
+    const COURSES    = "courses";
+    const ACTIVITIES = "activities";
+    const GROUPS     = "groups";
+    const GROUPINGS  = "groupings";
+    const USERS      = "users";
+    const ENROLMENTS = "course enrolments";
+    const ROLES      = "roles";
+    const RO_ASSIGNS = "role assignments";
+    const PERM_OVERR = "permissions overrides";
+    const GROUP_MEMS = "group members";
+    const GROUPING_G = "grouping groups";
+    const CHORTS     = "cohorts";
+}
+
+/**
+ * selectors, as defined https://docs.moodle.org/dev/Acceptance_testing#Providing_values_to_steps
+ */
+interface Selector {
+    const BLOCK = 'block';
+    const BUTTON = 'button';
+    const CHECKBOX = 'checkbox';
+    const CSS_ELEMENT = 'css_element';
+    const DIALOGUE = 'dialogue';
+    const FIELD = 'field';
+    const FIELDSET = 'fieldset';
+    const FILE = 'file';
+    const FILEMANAGER = 'filemanager';
+    const LINK = 'link';
+    const LINK_OR_BUTTON = 'link_or_button';
+    const OPTGROUP = 'optgroup';
+    const OPTION = 'option';
+    const RADIO = 'radio';
+    const REGION = 'region';
+    const SELECT = 'select';
+    const TABLE_ROW = 'table_row';
+    const TABLE = 'table';
+    const XPATH_ELEMENT = 'xpath_element';
+}
+
+/**
+ * text selectors, as defined https://docs.moodle.org/dev/Acceptance_testing#Providing_values_to_steps
+ */
+class TextSelector {
+    const BLOCK = 'block';
+    const CSS_ELEMENT = 'css_element';
+    const DIALOGUE = 'dialogue';
+    const FIELDSET = 'fieldset';
+    const REGION = 'region';
+    const TABLE = 'table';
+    const TABLE_ROW = 'table_row';
+    const XPATH_ELEMENT = 'xpath_element';
+}
+/**
+ * A collection of utility methods for generating Mink step definitions.
+ */
 trait Steps {
     use OutputUtils;
 
-    public function loginAs($username, $prefix = "And", $level = 2){
-        $t = $this->t($level);
+    private function resolveOptionalPrefix($prefix = 'And'){
+        return null === $prefix ? Prefix::_AND : $prefix;
+    }
+    /**
+     * Generate the "And I log in as '$username'".
+     * @param String $username
+     * @param Prefix $prefix
+     * @param int $indent number of tab stops to indent
+     * @return string '<\t\t...><prefix> I log in as <username>'
+     */
+    public function loginAs($username, $prefix = 'And', $indent = 2){
+
+        $t = $this->t($indent);
         return sprintf(
                 "%s%s I log in as \"%s\"%s",
                 $t, $prefix, $username, $this->n(), $t, $this->n());
     }
 
-    public function follow($link, $prefix = "And"){
-        $t = $this->t(2);
+    /**
+     *
+     * @param type $link
+     * @param Prefix $prefix
+     * @param int $indent number of tab stops to indent
+     * @return string '<\t\t...><prefix> I follow <link>'
+     */
+    public function follow($link, $prefix = 'And', $indent = 2){
+
+        $t = $this->t($indent);
         return sprintf("%s%s I follow \"%s\"%s", $t, $prefix, $link, $this->n());
     }
 
+    /**
+     *
+     * @return string "\t\tAnd I log out\n\n"
+     */
     public function logOut() {
         $t = $this->t(2);
+        $a = Prefix::_AND;
         $n = $this->n(2);
-        return sprintf("%sAnd I log out%s", $t, $n);
+
+        return sprintf("%s%s I log out%s", $t, $a, $n);
     }
 
-    public function theFollowingExist($what, array $fields, $prefix = "And"){
+    /**
+     *
+     * @param FixtureElement $fixtureElement
+     * @param array $fields
+     * @param Prefix $prefix
+     * @return type
+     */
+    public function theFollowingExist($fixtureElement, array $fields, $prefix = 'And'){
+
         $n = $this->n();
-        $str = sprintf("%s%s the following \"%s\" exist:%s", $this->t(1), $prefix, $what, $n);
+        $str = sprintf("%s%s the following \"%s\" exist:%s", $this->t(1), $prefix, $fixtureElement, $n);
 
         $t = $this->t(2);
         foreach($fields as $cells){
@@ -36,58 +167,156 @@ trait Steps {
         return $str;
     }
 
-    public function iPress($what, $prefix = 'And', $level = 2){
-        return sprintf('%s%s I press "%s"%s', $this->t($level), $prefix, $what, $this->n());
+    /**
+     * Mink step to press a button
+     * @param string $what
+     * @param Prefix $prefix
+     * @param int $indent the number of tabstops to indent
+     * @return '[$prefix] I press "[$what]"'
+     */
+    public function iPress($what, $prefix = 'And', $indent = 2){
+
+        return sprintf('%s%s I press "%s"%s', $this->t($indent), $prefix, $what, $this->n());
     }
 
-    public function saveChanges($level = 2, $prefix = 'And'){
-        return $this->iPress('Save changes', $prefix, $level);
+    /**
+     * Client of Steps::iPress()
+     * @param Prefix $prefix
+     * @param int $indent the number of tabstops to indent
+     * @return string '[prefix] I press "Save changes"'
+     */
+    public function saveChanges($prefix = 'And', $indent = 2){
+
+        return $this->iPress('Save changes', $prefix, $indent);
     }
 
-    public function iClickOn($whatId, $whatType, $whereId, $whereType, $prefix = 'And', $level = 2){
-        return sprintf('%s%s I click on "%s" "%s" in the "%s" "%s"%s', $this->t($level), $prefix, $whatId, $whatType, $whereId, $whereType, $this->n());
+
+    /**
+     * Click on the element of the specified type which is located inside the second element.
+     *
+     * @param string $selectorid
+     * @param Selector $selector
+     * @param string $textselectorid
+     * @param TextSelector $textselector
+     * @param Prefix $prefix
+     * @param int $indent the number of tabstops to indent
+     * @return string '[prefix] I click on "[selectorid]" "[selector]" in the "textselectorid" "[textselector]"'
+     */
+    public function iClickOn($selectorid, $selector, $textselectorid, $textselector, $prefix = 'And', $indent = 2){
+
+        return sprintf('%s%s I click on "%s" "%s" in the "%s" "%s"%s', $this->t($indent), $prefix, $selectorid, $selector, $textselectorid, $textselector, $this->n());
     }
 
-    public function turnEditingOn($prefix = 'And', $level = 2){
-        return sprintf("%s%s I turn editing mode on%s", $this->t($level), $prefix, $this->n());
+    /**
+     *
+     * @param Prefix $prefix
+     * @param int $indent the number of tabstops to indent
+     * @return string '[prefix] I turn editing mode on'
+     */
+    public function turnEditingOn($prefix = 'And', $indent = 2){
+        return sprintf("%s%s I turn editing mode on%s", $this->t($indent), $prefix, $this->n());
     }
 
-    public function shouldSeeWhere($what, $where, $whereType, $not = false, $prefix = 'And', $level = 2){
+    /**
+     *
+     * @param string $text the text we're looking for
+     * @param string $textselectorid id text for the text selector
+     * @param TextSelector $textselector
+     * @param bool $not if true, the output will include '...should not see...'
+     * @param Prefix $prefix
+     * @param int $indent the number of tabstops to indent
+     * @return string '[prefix] I should [not] see [text] in the [textselectorid] [textselector]'
+     */
+    public function shouldSeeWhere($text, $textselectorid, $textselector, $not = false, $prefix = 'And', $indent = 2){
         $not = $not ? ' not' : '';
-        return sprintf('%s%s I should%s see "%s" in the "%s" "%s"%s', $this->t($level), $prefix, $not, $what, $where, $whereType, $this->n());
+        return sprintf('%s%s I should%s see "%s" in the "%s" "%s"%s', $this->t($indent), $prefix, $not, $text, $textselectorid, $textselector, $this->n());
     }
 
-    public function shouldSee($what, $not = false, $prefix = 'And', $level = 2){
+    /**
+     *
+     * @param string $text
+     * @param bool $not
+     * @param Prefix $prefix
+     * @param int $indent the number of tabstops to indent
+     * @return string '[prefix] I should [not] see "[text]"'
+     */
+    public function shouldSee($text, $not = false, $prefix = 'And', $indent = 2){
         $not = $not ? ' not' : '';
-        return sprintf('%s%s I should%s see "%s"%s', $this->t($level), $prefix, $not, $what, $this->n());
+        return sprintf('%s%s I should%s see "%s"%s', $this->t($indent), $prefix, $not, $text, $this->n());
     }
 
-    public function addBlock($block, $prefix = 'And', $level = 2){
-        return sprintf('%s%s I add the "%s" block%s', $this->t($level), $prefix, $block, $this->n());
+    /**
+     *
+     * @param string $blockname name of a block to add
+     * @param Prefix $prefix
+     * @param int $indent the number of tabstops to indent
+     * @return string '[prefix]' I add the [blockname] block'
+     */
+    public function addBlock($blockname, $prefix = 'And', $indent = 2){
+
+        return sprintf('%s%s I add the "%s" block%s', $this->t($indent), $prefix, $blockname, $this->n());
     }
 
-    public function setFields($fields, $admin = false, $prefix = 'And', $level = 2){
+    /**
+     *
+     * @param array $fields specifying field (key) values, one per subarray
+     * in the following example structure:
+     *      array(
+     *            array(key1, val1),
+     *            array(key2, val2)
+     *           )
+     *
+     * @param bool $admin since the step definition for setting admin settings
+     * and for setting arbitrary form fields is so similar, this function
+     * can do both. Specify $admin = true for the former, false for the latter.
+     *
+     * @param Prefix $prefix
+     * @param int $indent the number of tabstops to indent
+     * @return string one of the following forms:
+     *     '[prefix] I set the following administration values:
+     *             |key1|val1|
+     *             |key2|val2|'
+     *
+     *     '[prefix] I set the following fields to these values values:
+     *             |key1|val1|
+     *             |key2|val2|'
+     */
+    public function setFields($fields, $admin = false, $prefix = 'And', $indent = 2){
+
         $command = $admin ? "I set the following administration settings values:" : "I set the following fields to these values:";
-        $str = sprintf('%s%s %s%s', $this->t($level), $prefix, $command, $this->n());
+        $str = sprintf('%s%s %s%s', $this->t($indent), $prefix, $command, $this->n());
         foreach($fields as $f){
-            $str.= sprintf('%s|%s|%s', $this->t($level+1), implode('|', $f), $this->n());
+            $str.= sprintf('%s|%s|%s', $this->t($indent+1), implode('|', $f), $this->n());
         }
         return $str;
     }
 
-    public function comment($str = '', $level = 0){
-        return sprintf("%s# %s%s", $this->t($level), $str, $this->n());
+    /**
+     * Helper method for building comment strings
+     * @param string $str the text of the comment line
+     * @param int $indent the number of tabstops to indent
+     * @return string '# [str]'
+     */
+    public function comment($str = '', $indent = 0){
+        return sprintf("%s# %s%s", $this->t($indent), $str, $this->n());
     }
 }
 
+/**
+ * Base class providing mass assignment through the constructor.
+ */
+abstract class ObjectBase {
 
-class ObjectBase {
+    /**
+     * Perform mass assignment using the input keys and values.
+     * Only values for keys that exist in descendent classes will be assigned.
+     * @param object|array $params objects will be cast to array.
+     */
     public function __construct($params = array()) {
         if(is_object($params)){
             $params = (array)$params;
         }
         $fields = array_keys(get_object_vars($this));
-
         foreach($params as $k => $v){
             if(in_array($k, $fields)){
                 $this->$k = $v;
@@ -96,8 +325,17 @@ class ObjectBase {
     }
 }
 
+/**
+ * Extendible class modeling a Behat feature file.
+ * Includes methods for setting up feature-level content
+ * as well as writing the final feature string to file.
+ */
 class Feature extends ObjectBase {
     use UserAccess, OutputUtils;
+
+    /**
+     * @var string filename
+     */
     public $file;
     protected $tags = array();
     protected $title;
@@ -109,9 +347,6 @@ class Feature extends ObjectBase {
     public $scenarios;
 
     public function __construct($params = array()) {
-        if(array_key_exists('tags', $params)){
-            unset($params['tags']);
-        }
         parent::__construct($params);
     }
 
@@ -241,7 +476,7 @@ class Feature extends ObjectBase {
     }
 }
 
-abstract class Background extends ObjectBase implements Stringy {
+abstract class Background extends ObjectBase implements Stringy, FixtureElement {
     use UserAccess, Steps;
     protected $feature;
 
@@ -264,14 +499,12 @@ abstract class Background extends ObjectBase implements Stringy {
     }
 
     public function courses(){
-        $prefix = 'Given';
         $fields = array(array("fullname", "shortname", "category"));
-        $what = 'courses';
 
         foreach($this->feature->courses as $course) {
             $fields[] = array($course->name, $course->shortname, 0);
         }
-        return $this->theFollowingExist($what, $fields, $prefix);
+        return $this->theFollowingExist(self::COURSES, $fields, Prefix::GIVEN);
     }
 
     public function users(){
@@ -361,11 +594,54 @@ abstract class Config extends ObjectBase implements Stringy {
             throw new Exception(sprintf("Setting does not exist for key '%s'", $key));
         }
 
-        if(empty($value)){
+        if(null === $value){
             return $this->settings[$key]->value();
         }else{
             $this->settings[$key]->value($value);
         }
+    }
+
+    public static function allConfigs() {
+        // filter out empty values
+        $settings = array_filter(static::settings());
+
+        $rawconfigs = array(array());
+
+        foreach ($settings as $setting) {
+            $append = array();
+
+            foreach($rawconfigs as $conf) {
+                foreach($setting['options'] as $option) {
+                    $conf[$setting['setting']['key']] = $option->key;
+                    $append[] = $conf;
+                }
+            }
+
+            $rawconfigs = $append;
+        }
+
+
+        $configs = array();
+        foreach($rawconfigs as $conf){
+            $c = new static;
+
+            foreach($conf as $key => $value){
+                $c->settingValue($key, $value);
+            }
+            $configs[] = $c;
+        }
+        $result = array_filter($configs, 'static::filter');
+//        foreach($result as $r){
+//            var_dump($r);
+//        }
+
+        return $result;
+    }
+
+    protected static function filter(Config $config){
+
+        // Sub-classes may, and should, implement this method.
+        return true && static::filter($config);
     }
 }
 
@@ -459,29 +735,27 @@ class Setting  extends ObjectBase {
      * selected option's key in the $$this->value member variable.
      *
      * Getter: If no option key is given as input, the currently-selected
-     * option key is returned from $this->value. If no value is set, and no
-     * input option key is provided, this fn returns '-', which signifies
-     * a setting that has no value within Moodle.
+     * option key is returned from $this->value.
      *
      * Setter: If a valid option key is given, it is stored in $this->value.
 
      * @see Setting::$value
-     * @param string $key
+     * @param string $newoptionkey
      * @return string
      * @throws Exception $key must be valid in the sense that it exists as a key
      * in the $this->options map
      */
-    public function value($key = null){
-        if(empty($key)){
-            if(empty($this->value)){
-                return '-';
+    public function value($newoptionkey = null){
+        if(null === $newoptionkey){
+            if(null === $this->value){
+                return null;
             }
             return $this->value;
         }else{
-            if(!array_key_exists($key, $this->options)){
-                throw new Exception(sprintf("Invalid key '%s' for setting '%s'", $key, $this->label));
+            if(!array_key_exists($newoptionkey, $this->options)){
+                throw new Exception(sprintf("Invalid key '%s' for setting '%s'", $newoptionkey, $this->label));
             }
-            $this->value = $key;
+            $this->value = $newoptionkey;
         }
     }
 
@@ -489,13 +763,12 @@ class Setting  extends ObjectBase {
      * Returns the string representation of the currently-selected option.
      * @return string
      * @throws Exception if no value is set
-     * @todo handle the exception case in a better way, ie always initialize value '-'.
      * @see Setting::__toString();
      * @see Setting::$value
      * @see Setting::$options
      */
     public function valueString(){
-        if(empty($this->value)){
+        if(null === $this->value){
             throw new Exception(sprintf("No value set for %s\n", $this->label));
         }
         return (string)$this->options[$this->value];
@@ -519,7 +792,7 @@ class Setting  extends ObjectBase {
      * @return string
      */
     public function __toString(){
-        if(empty($this->value)){
+        if($this->value === null){
             $optionlabel = 'not set';
         }else{
             $optionlabel = $this->options[$this->value]->label;
